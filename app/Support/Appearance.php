@@ -272,6 +272,7 @@ class Appearance
         $root = [
             'accent-base' => $this->values['accent'],
             'accent-on' => self::readableTextOn($this->values['accent']),
+            'accent-text-base' => self::readableOn($this->values['accent'], [$background['light']['sheet'], $background['light']['paper']]),
             'lesson-base' => $this->values['lesson_color'],
             'font-ui' => $font['ui'],
             'font-display' => $font['display'],
@@ -295,7 +296,7 @@ class Appearance
      * Готовые цвета для картинок экспорта. Картинка не умеет следовать системной теме,
      * поэтому тёмная палитра берётся, только если тёмная тема выбрана явно.
      *
-     * @return array{dark: bool, paper: string, sheet: string, ink: string, graphite: string, rule: string, accent: string, accentOn: string, lesson: string}
+     * @return array{dark: bool, paper: string, sheet: string, ink: string, graphite: string, rule: string, accent: string, accentText: string, accentOn: string, lesson: string}
      */
     public function palette(): array
     {
@@ -310,6 +311,9 @@ class Appearance
             'graphite' => $background['graphite'],
             'rule' => $background['rule'],
             'accent' => $dark ? self::mixWithWhite($this->values['accent'], 0.42) : $this->values['accent'],
+            'accentText' => $dark
+                ? self::mixWithWhite($this->values['accent'], 0.42)
+                : self::readableOn($this->values['accent'], [$background['sheet']]),
             'accentOn' => $dark ? $background['paper'] : self::readableTextOn($this->values['accent']),
             'lesson' => $dark ? self::mixWithWhite($this->values['lesson_color'], 0.55) : $this->values['lesson_color'],
         ];
@@ -326,6 +330,31 @@ class Appearance
         );
 
         return vsprintf('#%02x%02x%02x', $channels);
+    }
+
+    /**
+     * Акцентный цвет для текста на светлом фоне: тот же оттенок, затемнённый настолько,
+     * чтобы контраст со всеми фонами был не ниже 4.5 : 1 (норма WCAG для обычного текста).
+     *
+     * @param  list<string>  $backgrounds
+     */
+    public static function readableOn(string $hex, array $backgrounds, float $minContrast = 4.5): string
+    {
+        $channels = array_map('hexdec', str_split(ltrim($hex, '#'), 2));
+
+        for ($darken = 0.0; $darken < 1.0; $darken += 0.04) {
+            $color = vsprintf('#%02x%02x%02x', array_map(fn (int $c) => (int) round($c * (1 - $darken)), $channels));
+            $luminance = self::luminance($color);
+
+            $passes = collect($backgrounds)->every(
+                fn (string $background) => (self::luminance($background) + 0.05) / ($luminance + 0.05) >= $minContrast,
+            );
+            if ($passes) {
+                return $color;
+            }
+        }
+
+        return '#000000';
     }
 
     /**

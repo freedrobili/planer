@@ -35,7 +35,7 @@ class PlannerImage
     private string $overlayColor = '';
 
     /**
-     * @param  array{dark: bool, paper: string, sheet: string, ink: string, graphite: string, rule: string, accent: string, accentOn: string, lesson: string}  $palette
+     * @param  array{dark: bool, paper: string, sheet: string, ink: string, graphite: string, rule: string, accent: string, accentText: string, accentOn: string, lesson: string}  $palette
      */
     public function __construct(private readonly array $palette) {}
 
@@ -47,7 +47,7 @@ class PlannerImage
         $this->parts = [];
         $this->overlay = $overlay;
         $this->overlayColor = match (true) {
-            $overlay === null, $overlay->isMe() => $this->palette['accent'],
+            $overlay === null, $overlay->isMe() => $this->palette['accentText'],
             default => Tag::SWATCHES[$overlay->person->color][$this->palette['dark'] ? 1 : 0] ?? $this->palette['graphite'],
         };
 
@@ -171,7 +171,7 @@ class PlannerImage
         $titleX = self::PAD + 28;
         if ($task->time) {
             $label = $task->timeLabel();
-            $this->text($titleX, $y + 16, $label, 14, $task->done ? $this->palette['graphite'] : $accent, 600);
+            $this->text($titleX, $y + 16, $label, 14, $task->done ? $this->palette['graphite'] : $this->palette['accentText'], 600);
             $titleX += (int) ceil(mb_strlen($label) * 14 * 0.6) + 10;
         }
 

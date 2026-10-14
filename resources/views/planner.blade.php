@@ -9,16 +9,13 @@
     $isWeek = $view === 'week';
     $now = now();
     $title = $cap($selected->translatedFormat('l, j F'));
+    $lessonsLabel = fn (int $count) => $count ? \App\Support\Plural::ru($count, 'пара', 'пары', 'пар') : '';
 @endphp
 @extends('layouts.app')
 
 @section('title', $title)
 
 @section('header-aside')
-    <nav class="view-switch" aria-label="Режим планера">
-        <a class="chip chip--plain" href="{{ $plannerUrl($selected, ['view' => 'day']) }}" @unless ($isWeek) aria-current="page" @endunless>День</a>
-        <a class="chip chip--plain" href="{{ $plannerUrl($selected, ['view' => 'week']) }}" @if ($isWeek) aria-current="page" @endif>Неделя</a>
-    </nav>
     <nav class="week-nav" aria-label="Неделя">
         <a class="icon-btn" href="{{ $plannerUrl($selected->copy()->subWeek()) }}" aria-label="Предыдущая неделя">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
@@ -27,19 +24,14 @@
         <a class="icon-btn" href="{{ $plannerUrl($selected->copy()->addWeek()) }}" aria-label="Следующая неделя">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
         </a>
-        @unless ($isWeek ? $isCurrentWeek : $isToday)
-            <a class="btn btn--ghost" href="{{ $plannerUrl($today) }}">Сегодня</a>
-        @endunless
+        @include('partials.today-link', ['isCurrent' => $isWeek ? $isCurrentWeek : $isToday, 'href' => $plannerUrl($today)])
     </nav>
-    <button type="button" class="icon-btn" data-open-export aria-label="Экспорт дня или недели" title="Экспорт">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M3 12.5h10"/></svg>
-    </button>
 @endsection
 
 @section('page-class', 'page--planner')
 
 @section('content')
-@include('partials.people-bar')
+@include('partials.planner-bar')
 @if ($isWeek)
     @include('partials.week-view')
 @else
@@ -74,7 +66,7 @@
         <div class="sheet__side">
             <div class="sheet__head">
                 <h1 class="sheet__title">{{ $cap($selected->translatedFormat('l')) }}<span>{{ $selected->translatedFormat('j F') }}@if ($hasLessons), {{ $weekNumber }}-я неделя, {{ $isOddWeek ? 'нечётная' : 'чётная' }}@endif</span></h1>
-                <p class="sheet__progress" data-progress @if ($filter) data-filter-name="{{ $filter->name }}" @endif>
+                <p class="sheet__progress" data-progress data-lessons="{{ $lessonsLabel($lessonCount) }}" @if ($filter) data-filter-name="{{ $filter->name }}" @endif>
                     @if ($filter)
                         @if ($dayTotal)
                             «{{ $filter->name }}»: готово {{ $dayDone }} из {{ $dayTotal }}
@@ -82,7 +74,9 @@
                             Нет задач с тегом «{{ $filter->name }}»
                         @endif
                     @elseif ($dayTotal)
-                        Готово {{ $dayDone }} из {{ $dayTotal }}
+                        Готово {{ $dayDone }} из {{ $dayTotal }}@if ($lessonCount) · {{ $lessonsLabel($lessonCount) }}@endif
+                    @elseif ($lessonCount)
+                        Задач нет · {{ $lessonsLabel($lessonCount) }}
                     @else
                         Пока ничего не запланировано
                     @endif
@@ -160,31 +154,41 @@
         </div>
 
         <div class="sheet__schedule" data-schedule>
-            <section class="timeline" aria-label="Расписание по часам" @if ($isToday) data-today @endif>
+            @if ($overlay)
+                <div class="timeline-heads" aria-hidden="true">
+                    <span class="{{ $owner->colorClass() }}">{{ $owner->isMe() ? 'Мой график' : $owner->name() }}</span>
+                    <span class="{{ $overlay->colorClass() }}">{{ $overlay->isMe() ? 'Мой график' : $overlay->name() }}</span>
+                </div>
+            @endif
+            <section class="timeline{{ $overlay ? ' is-split' : '' }}" aria-label="Расписание по часам" @if ($isToday) data-today @endif>
                 @foreach ($hours as $hour)
                     @php $label = sprintf('%02d:00', $hour); @endphp
                     <div class="hour {{ $isToday && $hour < $now->hour ? 'is-past' : '' }} {{ in_array($hour, $busyHours) ? 'is-busy' : (in_array($hour, $plannedHours) ? 'is-planned' : '') }}" data-hour="{{ $hour }}" data-drop-hour="{{ $hour }}">
                         <span class="hour__label">{{ $label }}</span>
                         <div class="hour__body">
-                            @if ($byHour->has($hour))
-                                <ul class="tasks">
-                                    @foreach ($byHour[$hour] as $entry)
-                                        @if ($entry['ghost'])
-                                            @include('partials.ghost', ['entry' => $entry])
-                                        @elseif ($entry['type'] === 'lesson')
-                                            @include('partials.lesson', ['lesson' => $entry['item']])
-                                        @else
-                                            @include('partials.task', ['task' => $entry['item']])
-                                        @endif
-                                    @endforeach
-                                </ul>
-                            @endif
                             <button type="button" class="hour__add" data-add-at="{{ $label }}" aria-label="Добавить задачу на {{ $label }}">
                                 <span>+ {{ $label }}</span>
                             </button>
                         </div>
                     </div>
                 @endforeach
+
+                {{-- Записи поверх сетки: начало и высота блока — по времени, пересекающиеся встают рядом. --}}
+                <div class="timeline__events">
+                    @foreach ($events as $event)
+                        <ul class="event event--{{ $event['column'] }} {{ $event['span'] < 1 ? 'is-short' : '' }} {{ $overlay || $event['lanes'] > 1 ? 'is-narrow' : '' }}"
+                            style="--top: {{ $event['top'] }}; --span: {{ $event['span'] }}; --lane: {{ $event['lane'] }}; --lanes: {{ $event['lanes'] }}; --stack: {{ $event['stack'] }}">
+                            @if ($event['ghost'])
+                                @include('partials.ghost', ['entry' => $event])
+                            @elseif ($event['type'] === 'lesson')
+                                @include('partials.lesson', ['lesson' => $event['item']])
+                            @else
+                                @include('partials.task', ['task' => $event['item']])
+                            @endif
+                        </ul>
+                    @endforeach
+                </div>
+
                 @if ($isToday)
                     <div class="now" data-now aria-hidden="true"><span>{{ $now->format('H:i') }}</span></div>
                 @endif

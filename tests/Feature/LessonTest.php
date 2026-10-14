@@ -129,6 +129,17 @@ class LessonTest extends TestCase
             ->assertSee('Готово 0 из 2'); // пары не считаются задачами
     }
 
+    public function test_summary_counts_lessons_instead_of_saying_the_day_is_empty(): void
+    {
+        Lesson::factory()->create(['weekday' => 3]);
+
+        $this->get('/?date=2026-10-07&view=day')->assertSee('Задач нет · 1 пара')->assertDontSee('Пока ничего не запланировано');
+        $this->get('/?date=2026-10-07&view=week')->assertSee('Задач на неделе нет · 1 пара');
+
+        Task::factory()->create(['date' => '2026-10-07']);
+        $this->get('/?date=2026-10-07&view=day')->assertSee('Готово 0 из 1 · 1 пара');
+    }
+
     public function test_marks_hours_covered_by_lesson(): void
     {
         Lesson::factory()->create(['weekday' => 3, 'starts_at' => '10:10', 'ends_at' => '12:00']);

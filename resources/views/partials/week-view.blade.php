@@ -1,10 +1,14 @@
 <main class="sheet sheet--week">
     <div class="week-toolbar">
-        <p class="week-toolbar__progress" data-week-progress @if ($filter) data-filter-name="{{ $filter->name }}" @endif>
-            @if ($weekTotal)
-                {{ $filter ? "«{$filter->name}»: готово" : 'За неделю готово' }} {{ $weekDone }} из {{ $weekTotal }}
+        <p class="week-toolbar__progress" data-week-progress data-lessons="{{ $lessonsLabel($weekLessonCount) }}" @if ($filter) data-filter-name="{{ $filter->name }}" @endif>
+            @if ($filter)
+                {{ $weekTotal ? "«{$filter->name}»: готово {$weekDone} из {$weekTotal}" : "На этой неделе нет задач с тегом «{$filter->name}»" }}
+            @elseif ($weekTotal)
+                За неделю готово {{ $weekDone }} из {{ $weekTotal }}@if ($weekLessonCount) · {{ $lessonsLabel($weekLessonCount) }}@endif
+            @elseif ($weekLessonCount)
+                Задач на неделе нет · {{ $lessonsLabel($weekLessonCount) }}
             @else
-                {{ $filter ? "На этой неделе нет задач с тегом «{$filter->name}»" : 'На этой неделе пока ничего не запланировано' }}
+                На этой неделе пока ничего не запланировано
             @endif
         </p>
         @include('partials.tag-filter')

@@ -60,12 +60,16 @@
         const summary = document.querySelector('[data-week-progress]');
         const total = document.querySelectorAll('.week-grid .task').length;
         const done = document.querySelectorAll('.week-grid .task.is-done').length;
-        const filterName = summary.dataset.filterName;
-        if (total) {
-            summary.textContent = `${filterName ? `«${filterName}»: готово` : 'За неделю готово'} ${done} из ${total}`;
+        const { filterName, lessons } = summary.dataset;
+        if (filterName) {
+            summary.textContent = total
+                ? `«${filterName}»: готово ${done} из ${total}`
+                : `На этой неделе нет задач с тегом «${filterName}»`;
+        } else if (total) {
+            summary.textContent = `За неделю готово ${done} из ${total}${lessons ? ` · ${lessons}` : ''}`;
         } else {
-            summary.textContent = filterName
-                ? `На этой неделе нет задач с тегом «${filterName}»`
+            summary.textContent = lessons
+                ? `Задач на неделе нет · ${lessons}`
                 : 'На этой неделе пока ничего не запланировано';
         }
     };
@@ -76,13 +80,15 @@
         const done = document.querySelectorAll('.sheet .task.is-done').length;
 
         const progress = document.querySelector('[data-progress]');
-        const filterName = progress.dataset.filterName;
+        const { filterName, lessons } = progress.dataset;
         if (filterName) {
             progress.textContent = total
                 ? `«${filterName}»: готово ${done} из ${total}`
                 : `Нет задач с тегом «${filterName}»`;
+        } else if (total) {
+            progress.textContent = `Готово ${done} из ${total}${lessons ? ` · ${lessons}` : ''}`;
         } else {
-            progress.textContent = total ? `Готово ${done} из ${total}` : 'Пока ничего не запланировано';
+            progress.textContent = lessons ? `Задач нет · ${lessons}` : 'Пока ничего не запланировано';
         }
 
         const day = document.querySelector('[data-selected-day]');
@@ -507,7 +513,7 @@
     } else if (schedule && schedule.scrollHeight > schedule.clientHeight) {
         const target = timeline
             ? timeline.querySelector(`.hour[data-hour="${new Date().getHours() - 1}"]`)
-            : schedule.querySelector('.hour .tasks')?.closest('.hour');
+            : schedule.querySelector('.timeline .event');
         if (target) schedule.scrollTop = target.offsetTop - 8;
     }
     setInterval(placeNow, 30_000);

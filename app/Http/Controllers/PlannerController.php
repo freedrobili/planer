@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Support\Appearance;
 use App\Support\Owner;
 use App\Support\PlannerDays;
+use App\Support\TimelineLayout;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -43,18 +44,16 @@ class PlannerController extends Controller
         $untimed = $selectedDay['untimed'];
         $lessons = $selectedDay['lessons'];
 
-        $byHour = $selectedDay['timeline']
-            ->groupBy(fn (array $entry) => (int) substr($entry['time'], 0, 2));
-
-        // Часы, занятые парами, — для полосы слева в расписании.
+        // Часы, занятые парами и задачами, — для полосы слева в расписании.
         $busyHours = $lessons->flatMap(fn (Lesson $l) => $l->coveredHours())->unique()->values();
         $plannedHours = $dayTasks->flatMap(fn (Task $task) => $task->coveredHours())->unique()->values();
-        $usedHours = $byHour->keys()->concat($busyHours)->concat($plannedHours);
 
+        $bounds = TimelineLayout::hourBounds($selectedDay['timeline']);
         $hours = range(
-            min($appearance->dayStart(), $usedHours->min() ?? $appearance->dayStart()),
-            max($appearance->dayEnd(), $usedHours->max() ?? $appearance->dayEnd()),
+            min($appearance->dayStart(), $bounds[0] ?? $appearance->dayStart()),
+            max($appearance->dayEnd(), $bounds[1] ?? $appearance->dayEnd()),
         );
+        $events = TimelineLayout::place($selectedDay['timeline'], $hours[0], split: $overlay !== null);
 
         return view('planner', [
             'view' => $view,
@@ -66,11 +65,12 @@ class PlannerController extends Controller
             'untimed' => $untimed,
             'ghostUntimed' => $selectedDay['ghostUntimed'],
             'freeTogether' => $selectedDay['freeTogether'],
-            'byHour' => $byHour,
+            'events' => $events,
             'busyHours' => $busyHours->all(),
             'plannedHours' => $plannedHours->all(),
             'conflicts' => $days->pluck('conflicts')->reduce(fn (array $all, array $day) => $all + $day, []),
             'lessonCount' => $lessons->count(),
+            'weekLessonCount' => $days->sum(fn (array $day) => $day['lessons']->count()),
             'weekNumber' => $planner->timetable->weekNumber($selected),
             'isOddWeek' => $planner->timetable->isOddWeek($selected),
             'hasLessons' => $planner->hasLessons(),

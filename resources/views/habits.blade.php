@@ -24,9 +24,7 @@
         <a class="icon-btn" href="{{ route('habits', ['date' => $weekStart->copy()->addWeek()->toDateString()]) }}" aria-label="Следующая неделя">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
         </a>
-        @unless ($isCurrentWeek)
-            <a class="btn btn--ghost" href="{{ route('habits') }}">Сегодня</a>
-        @endunless
+        @include('partials.today-link', ['isCurrent' => $isCurrentWeek, 'href' => route('habits')])
     </nav>
 @endsection
 
